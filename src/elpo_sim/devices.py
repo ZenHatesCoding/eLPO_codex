@@ -1,6 +1,6 @@
 import numpy as np
 
-from .filters import lowpass
+from .filters import imdd_chromatic_dispersion, insertion_loss, lowpass
 
 
 def quantize_uniform(x, bits, full_scale=None):
@@ -25,6 +25,14 @@ def add_awgn_by_rms(x, noise_rms, rng):
 def dac_model(symbol_wave, sample_rate_hz, cfg, rng):
     y = quantize_uniform(symbol_wave, cfg.get("bits"), cfg.get("full_scale"))
     y = lowpass(y, sample_rate_hz, cfg.get("bandwidth_hz"), cfg.get("order", 1))
+    y = insertion_loss(
+        y,
+        sample_rate_hz,
+        cfg.get("loss_db_at_hz"),
+        cfg.get("loss_ref_hz"),
+        cfg.get("loss_exponent", 1.0),
+        cfg.get("dc_loss_db", 0.0),
+    )
     y = add_awgn_by_rms(y, cfg.get("noise_rms", 0.0), rng)
     return y
 
@@ -32,6 +40,14 @@ def dac_model(symbol_wave, sample_rate_hz, cfg, rng):
 def driver_model(v, sample_rate_hz, cfg, rng):
     y = np.asarray(v, dtype=float) * cfg.get("gain_v_per_unit", 1.0)
     y = lowpass(y, sample_rate_hz, cfg.get("bandwidth_hz"), cfg.get("order", 1))
+    y = insertion_loss(
+        y,
+        sample_rate_hz,
+        cfg.get("loss_db_at_hz"),
+        cfg.get("loss_ref_hz"),
+        cfg.get("loss_exponent", 1.0),
+        cfg.get("dc_loss_db", 0.0),
+    )
     clip = cfg.get("clip_v")
     if clip:
         y = np.clip(y, -clip, clip)
@@ -57,8 +73,25 @@ def mzm_model(v, cfg):
 
 def optical_channel_model(power_w, sample_rate_hz, cfg, rng):
     y = np.asarray(power_w, dtype=float)
-    y *= 10 ** (-cfg.get("loss_db", 0.0) / 10.0)
+    length_km = cfg.get("fiber_length_km", 0.0) or 0.0
+    fiber_loss_db = length_km * cfg.get("fiber_loss_db_per_km", 0.0)
+    y *= 10 ** (-(cfg.get("connector_loss_db", 0.0) + cfg.get("loss_db", 0.0) + fiber_loss_db) / 10.0)
     y = lowpass(y, sample_rate_hz, cfg.get("bandwidth_hz"), cfg.get("order", 1))
+    y = insertion_loss(
+        y,
+        sample_rate_hz,
+        cfg.get("loss_db_at_hz"),
+        cfg.get("loss_ref_hz"),
+        cfg.get("loss_exponent", 1.0),
+        cfg.get("dc_loss_db", 0.0),
+    )
+    y = imdd_chromatic_dispersion(
+        y,
+        sample_rate_hz,
+        length_km,
+        cfg.get("dispersion_ps_nm_km", 0.0),
+        cfg.get("wavelength_nm", 1310.0),
+    )
     rin = cfg.get("rin_db_per_hz")
     if rin is not None:
         rin_lin = 10 ** (rin / 10.0)
@@ -74,6 +107,14 @@ def pd_tia_model(power_w, sample_rate_hz, cfg, rng):
     current = add_awgn_by_rms(current, shot, rng)
     volts = current * cfg.get("tia_ohm", 500.0)
     volts = lowpass(volts, sample_rate_hz, cfg.get("bandwidth_hz"), cfg.get("order", 1))
+    volts = insertion_loss(
+        volts,
+        sample_rate_hz,
+        cfg.get("loss_db_at_hz"),
+        cfg.get("loss_ref_hz"),
+        cfg.get("loss_exponent", 1.0),
+        cfg.get("dc_loss_db", 0.0),
+    )
     volts = add_awgn_by_rms(volts, cfg.get("input_noise_rms_v", 0.0), rng)
     return volts
 

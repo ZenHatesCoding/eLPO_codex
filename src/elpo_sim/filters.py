@@ -36,6 +36,33 @@ def lowpass(x, sample_rate_hz, bandwidth_hz, order=1):
     return fft_filter(x, sample_rate_hz, response)
 
 
+def insertion_loss(x, sample_rate_hz, loss_db_at_hz, ref_hz, exponent=1.0, dc_loss_db=0.0):
+    if loss_db_at_hz is None or loss_db_at_hz <= 0 or ref_hz is None or ref_hz <= 0:
+        return np.asarray(x, dtype=float)
+
+    def response(freqs):
+        ratio = np.clip(freqs / ref_hz, 0.0, None)
+        loss_db = dc_loss_db + loss_db_at_hz * ratio ** exponent
+        return 10.0 ** (-loss_db / 20.0)
+
+    return fft_filter(x, sample_rate_hz, response)
+
+
+def imdd_chromatic_dispersion(x, sample_rate_hz, length_km, dispersion_ps_nm_km=0.0, wavelength_nm=1310.0):
+    if not length_km or abs(dispersion_ps_nm_km) <= 1e-15:
+        return np.asarray(x, dtype=float)
+    c = 299792458.0
+    wavelength_m = wavelength_nm * 1e-9
+    dispersion_s_m2 = dispersion_ps_nm_km * 1e-6
+    length_m = length_km * 1e3
+
+    def response(freqs):
+        phase = np.pi * dispersion_s_m2 * wavelength_m * wavelength_m * length_m * freqs * freqs / c
+        return np.cos(phase)
+
+    return fft_filter(x, sample_rate_hz, response)
+
+
 def ctle(x, sample_rate_hz, zero_hz, pole1_hz, pole2_hz=None, dc_gain=1.0):
     if not zero_hz or not pole1_hz:
         return np.asarray(x, dtype=float)
@@ -73,4 +100,3 @@ def sample_at_sps(wave, input_sps, output_sps=2, phase_ui=0.0):
     n = int(np.floor((wave.size - start) / step))
     idx = start + np.arange(n) * step
     return np.interp(idx, np.arange(wave.size), wave)
-

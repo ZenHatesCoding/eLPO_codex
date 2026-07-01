@@ -3,7 +3,7 @@ import numpy as np
 
 from .devices import adc_model, dac_model, driver_model, mzm_model, optical_channel_model, pd_tia_model
 from .dsp import train_rx_ffe_lms, dd_lms_update, level_scale_from_training, apply_level_scale
-from .filters import apply_fir, ctle, waveform_from_symbols, sample_at_sps, resample_linear
+from .filters import apply_fir, ctle, insertion_loss, waveform_from_symbols, sample_at_sps, resample_linear
 from .metrics import ber_from_indices, ser_from_indices, pam4_eye_openings
 from .mlse import causal_fir, estimate_noise_whitening_pr, hard_mlse
 from .pam4 import bits_to_symbols, random_bits, slicer, PAM4_LEVELS
@@ -56,6 +56,16 @@ def run_link(cfg, artifact_dir="artifacts"):
         )
 
     channel_in = resample_linear(dac2, dsp_sps, channel_sps)
+    elec = cfg.get("electrical_channel", {})
+    if elec.get("enable", False):
+        channel_in = insertion_loss(
+            channel_in,
+            channel_sample_rate,
+            elec.get("loss_db_at_hz"),
+            elec.get("loss_ref_hz"),
+            elec.get("loss_exponent", 1.0),
+            elec.get("dc_loss_db", 0.0),
+        )
     if cfg.get("ideal_link", False):
         tia_ch = channel_in.copy()
     else:
@@ -124,6 +134,7 @@ def run_link(cfg, artifact_dir="artifacts"):
     return {
         "name": name,
         "bit_rate_gbps": cfg.get("bit_rate_gbps"),
+        "profile_name": cfg.get("profile_name"),
         "symbol_rate_hz": symbol_rate,
         "rates": {
             "dsp_sps": dsp_sps,
@@ -170,4 +181,5 @@ def run_link(cfg, artifact_dir="artifacts"):
             "x2_dsp": x2,
         },
     }
+
 
