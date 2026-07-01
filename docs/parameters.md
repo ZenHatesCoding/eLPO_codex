@@ -24,6 +24,13 @@ Public anchors used for this choice:
 - OIF CEI-112G and CEI-224G implementation agreements define common electrical interface families used around 112G/224G ecosystems.
 - Recent PR-PAM4/MLSE IMDD papers commonly combine partial-response shaping and MLSE to trade bandwidth for sequence detection robustness.
 
+
+## Bandwidth Source In This Baseline
+
+There is no measured S-parameter in the repository yet. The current DAC, driver, optical channel, and PD/TIA bandwidths are explicit first-order low-pass assumptions expressed as fractions of symbol rate. They are useful for algorithm bring-up and sensitivity sweeps, but they are not calibrated to a specific package, board, modulator, TIA, or module.
+
+When S-parameter or measured impulse-response data is available, the low-pass placeholders should be replaced by an imported/fitted channel response. Until then, any BER number should be read as a relative algorithm result under the configured assumptions, not as a compliance prediction.
+
 ## Device Defaults
 
 Bandwidths are expressed as fractions of symbol rate:
@@ -48,8 +55,16 @@ The models are first-order behavioral blocks, not final compact models. The impo
 - MLSE uses a short partial-response memory by default (`pr_order = 3`) so the Viterbi state space remains transparent.
 - BER is reported separately at the FFE output and MLSE output.
 
+
+## MLSE Gain Conditions
+
+The default 112G/224G presets train the RX FFE toward the original PAM4 symbols, so the FFE output is close to a zero-ISI target. In that mode the estimated partial-response filter is close to `[1, 0, 0, 0]`, and hard MLSE has little memory to exploit.
+
+`params_pr_mlse_demo()` demonstrates the intended PR-MLSE mode: the RX FFE is trained to a controlled partial-response target, for example `[1, 0.45, -0.12]`. The direct FFE slicer then sees intentional ISI, while MLSE uses the PR estimate to recover the sequence.
+
 ## Notes To Improve Later
 
 - Replace the simple optical channel with measured S-parameter import or fitted pole-zero models.
 - Add standards-specific presets for 802.3ck, 802.3dj, CEI-112G-VSR/MR/LR, and CEI-224G.
 - Add calibration scripts that fit device dictionaries from lab data.
+

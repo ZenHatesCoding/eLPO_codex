@@ -113,3 +113,20 @@ def params_clean(bit_rate_gbps=112):
     cfg["rx_ffe"].update({"n_taps": 7, "mu": 0.05, "dd_mu": 0.0, "n_train": 1000, "dd_start": 1000, "max_symbol_delay": 6})
     cfg["mlse"].update({"enable": False, "pr_order": 1, "train_symbols": 1000})
     return cfg
+
+
+def params_pr_mlse_demo(bit_rate_gbps=112):
+    cfg = params_clean(bit_rate_gbps)
+    cfg["name"] = f"{bit_rate_gbps}G_PAM4_PR_MLSE_DEMO"
+    cfg["ideal_link"] = True
+    cfg["rx_ffe"].update({
+        "n_taps": 9,
+        "mu": 0.04,
+        "dd_mu": 0.0,
+        "n_train": 2000,
+        "dd_start": 2000,
+        "max_symbol_delay": 8,
+        "target_response": [1.0, 0.45, -0.12],
+    })
+    cfg["mlse"].update({"enable": True, "pr_order": 2, "train_symbols": 2500})
+    return cfg

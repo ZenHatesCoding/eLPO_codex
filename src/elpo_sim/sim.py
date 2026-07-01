@@ -69,7 +69,12 @@ def run_link(cfg, artifact_dir="artifacts"):
     x2 = _ac_normalize(adc2)
 
     rx_ffe_cfg = cfg.get("rx_ffe", {})
-    ffe = train_rx_ffe_lms(x2, tx_symbols, rx_ffe_cfg)
+    target_response = np.asarray(rx_ffe_cfg.get("target_response", [1.0]), dtype=float)
+    if target_response.size > 1:
+        ffe_target = np.convolve(tx_symbols, target_response, mode="full")[: len(tx_symbols)]
+    else:
+        ffe_target = tx_symbols
+    ffe = train_rx_ffe_lms(x2, ffe_target, rx_ffe_cfg)
     y_raw, taps_dd = dd_lms_update(
         x2,
         ffe["taps"],
@@ -78,8 +83,9 @@ def run_link(cfg, artifact_dir="artifacts"):
         rx_ffe_cfg,
     )
     aligned_tx = tx_symbols[: len(y_raw)]
-    n_scale = min(rx_ffe_cfg.get("n_train", 1000), len(y_raw), len(aligned_tx))
-    gain, offset = level_scale_from_training(y_raw[:n_scale], aligned_tx[:n_scale])
+    aligned_ffe_target = ffe_target[: len(y_raw)]
+    n_scale = min(rx_ffe_cfg.get("n_train", 1000), len(y_raw), len(aligned_ffe_target))
+    gain, offset = level_scale_from_training(y_raw[:n_scale], aligned_ffe_target[:n_scale])
     y = apply_level_scale(y_raw, gain, offset)
     rx_idx_ffe = slicer(y)
 
@@ -134,6 +140,7 @@ def run_link(cfg, artifact_dir="artifacts"):
         "ffe": ffe,
         "rx_ffe_taps": taps_dd,
         "level_scale": (gain, offset),
+        "rx_ffe_target_response": target_response,
         "partial_response": pr,
         "mlse_enabled": mlse_enabled,
         "ber_ffe": ber_ffe,
@@ -166,3 +173,4 @@ def run_link(cfg, artifact_dir="artifacts"):
             "x2_dsp": x2,
         },
     }
+

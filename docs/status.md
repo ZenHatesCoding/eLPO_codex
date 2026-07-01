@@ -22,4 +22,6 @@
 - No fixed-point datapath model yet.
 - MZM, PD/TIA, DAC, and ADC parameters are plausible defaults, not final selected silicon or module parameters.
 - MLSE currently uses a hard-decision Viterbi detector with short PR memory; no soft metrics or FEC interface yet.
+- Current bandwidth limits are parameterized first-order low-pass assumptions, not measured S-parameter-derived responses.
 - Eye plotting is visualization-oriented. Compliance-style eye masks and bathtub extrapolation are not implemented yet.
+

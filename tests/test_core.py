@@ -5,7 +5,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from elpo_sim.configs import params_112g, params_clean
+from elpo_sim.configs import params_112g, params_clean, params_pr_mlse_demo
 from elpo_sim.mlse import estimate_pr_filter, hard_mlse
 from elpo_sim.pam4 import bits_to_symbols, random_bits, slicer
 from elpo_sim.sim import run_link
@@ -56,3 +56,15 @@ def test_smoke_link_short():
     assert np.isfinite(result["ber_final"])
     assert result["rx_ffe_taps"].size == cfg["rx_ffe"]["n_taps"]
 
+
+
+def test_pr_target_mlse_improves_over_ffe_slicer():
+    cfg = params_pr_mlse_demo(112)
+    cfg["n_symbols"] = 3000
+    cfg["rx_ffe"]["n_train"] = 1000
+    cfg["rx_ffe"]["dd_start"] = 1000
+    cfg["mlse"]["train_symbols"] = 1200
+    result = run_link(cfg, artifact_dir="artifacts/test")
+    assert result["ber_ffe"] > 0.05
+    assert result["ber_mlse"] == 0.0
+    assert np.allclose(result["partial_response"], cfg["rx_ffe"]["target_response"], atol=0.03)
