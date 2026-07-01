@@ -8,5 +8,6 @@ __all__ = [
     "mlse",
     "metrics",
     "sim",
+    "bayes_opt",
 ]
 

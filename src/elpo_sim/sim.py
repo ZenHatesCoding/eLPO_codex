@@ -124,12 +124,14 @@ def run_link(cfg, artifact_dir="artifacts"):
     ser_final, sym_errors_final, _ = ser_from_indices(tx_idx, rx_idx_final)
 
     name = cfg.get("name", "run")
-    out_dir = os.path.join(artifact_dir, name)
-    os.makedirs(out_dir, exist_ok=True)
-    eye_wave = resample_linear(x2[: min(len(x2), 2 * 5000 * dsp_sps)], dsp_sps, eye_sps)
-    phase_samples = ffe["phase"] * eye_sps / float(dsp_sps)
-    save_eye(eye_wave, eye_sps, os.path.join(out_dir, "eye_rx_input_50sps.png"), f"{name} RX input eye, 50 sps", phase_samples=phase_samples)
-    save_bathtub_like_hist(y, os.path.join(out_dir, "ffe_hist.png"), f"{name} 1 sps RX FFE output")
+    output_plots = bool(cfg.get("output_plots", True))
+    out_dir = os.path.join(artifact_dir, name) if artifact_dir is not None else None
+    if output_plots and out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
+        eye_wave = resample_linear(x2[: min(len(x2), 2 * 5000 * dsp_sps)], dsp_sps, eye_sps)
+        phase_samples = ffe["phase"] * eye_sps / float(dsp_sps)
+        save_eye(eye_wave, eye_sps, os.path.join(out_dir, "eye_rx_input_50sps.png"), f"{name} RX input eye, 50 sps", phase_samples=phase_samples)
+        save_bathtub_like_hist(y, os.path.join(out_dir, "ffe_hist.png"), f"{name} 1 sps RX FFE output")
 
     return {
         "name": name,

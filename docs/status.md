@@ -24,6 +24,8 @@ The current validated bring-up target is 112G lab shorthand / 100G-per-lane PAM4
 - 50 sps eye rendering from aligned RX input.
 - Clean ideal validation case with zero BER.
 - Controlled colored-noise PR-MLSE demo.
+- TX FFE 9-tap single-point and white-box Bayesian optimization entry point.
+- Plot suppression switch for simulation sweeps.
 
 ## Important Limitations
 
@@ -32,6 +34,7 @@ The current validated bring-up target is 112G lab shorthand / 100G-per-lane PAM4
 - No measured S-parameter import yet.
 - No CDR/timing recovery loop yet; phase is searched during FFE training.
 - TX FFE taps and TX CTLE poles/zeros are placeholders, not yet constrained to an exact clause or IA tap table/reference transmitter.
+- TX FFE Bayesian optimization uses local engineering bounds around the placeholder preset; standards/conformance tap limits still need to be added.
 - Optical DR/FR/LR reach profiles are placeholders; PMD optical budgets and compliance metrics are not implemented yet.
 - MLSE currently uses a hard-decision Viterbi detector with short PR memory; no soft metrics or FEC interface yet.
 - Eye plotting is visualization-oriented. Compliance-style eye masks and bathtub extrapolation are not implemented yet.

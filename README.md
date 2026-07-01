@@ -25,6 +25,7 @@ The implementation keeps DSP algorithms in plain NumPy so the math remains visib
 .\.venv\Scripts\python examples\run_clean.py
 .\.venv\Scripts\python examples\run_pr_mlse_demo.py
 .\.venv\Scripts\python examples\run_112g.py
+.\.venv\Scripts\python examples\optimize_tx_ffe.py --mode single
 .\.venv\Scripts\python -m pytest
 ```
 
@@ -40,6 +41,7 @@ See:
 - `docs/parameters.md`
 - `docs/status.md`
 - `docs/roadmap.md`
+- `docs/tx_ffe_bayes_opt.md`
 
 
 

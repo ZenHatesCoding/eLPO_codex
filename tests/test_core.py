@@ -6,6 +6,12 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from elpo_sim.configs import params_112g, params_clean
+from elpo_sim.bayes_opt import (
+    GaussianProcessRegressor,
+    default_tx_ffe_bounds,
+    expected_improvement_minimize,
+    expand_taps,
+)
 from elpo_sim.metrics import ber_from_indices
 from elpo_sim.mlse import causal_fir, estimate_noise_whitening_pr, estimate_pr_filter, hard_mlse
 from elpo_sim.pam4 import bits_to_symbols, random_bits, slicer
@@ -35,6 +41,7 @@ def test_clean_link_has_zero_ber_and_expected_rates():
     cfg["n_symbols"] = 2500
     cfg["rx_ffe"]["n_train"] = 800
     cfg["rx_ffe"]["dd_start"] = 800
+    cfg["output_plots"] = False
     result = run_link(cfg, artifact_dir="artifacts/test")
     assert result["rates"]["dsp_sps"] == 2
     assert result["rates"]["dac_sps"] == 2
@@ -52,6 +59,7 @@ def test_smoke_link_short():
     cfg["rx_ffe"]["n_train"] = 800
     cfg["rx_ffe"]["dd_start"] = 800
     cfg["mlse"]["train_symbols"] = 900
+    cfg["output_plots"] = False
     result = run_link(cfg, artifact_dir="artifacts/test")
     assert result["bit_count"] > 1000
     assert np.isfinite(result["ber_final"])
@@ -77,3 +85,20 @@ def test_noise_whitening_pr_mlse_improves_colored_noise():
     ber_mlse, _, _ = ber_from_indices(idx, slicer(mlse_levels))
     assert np.allclose(pr, [1.0, -rho], atol=0.05)
     assert ber_mlse < ber_ffe * 0.25
+
+def test_tx_ffe_taps_expand_around_main_tap():
+    taps = expand_taps([-0.08, 1.0, -0.05], n_taps=9)
+    assert np.allclose(taps, [0.0, 0.0, 0.0, -0.08, 1.0, -0.05, 0.0, 0.0, 0.0])
+
+
+def test_white_box_gp_expected_improvement_prefers_promising_region():
+    x = np.array([[-1.0], [0.0], [1.0]])
+    y = np.array([1.0, 0.0, 1.0])
+    bounds = np.array([[-1.5, 1.5]])
+    gp = GaussianProcessRegressor(bounds, length_scale=0.5).fit(x, y)
+    candidates = np.array([[-1.4], [0.1], [1.4]])
+    mean, std = gp.predict(candidates)
+    ei = expected_improvement_minimize(mean, std, np.min(y), xi=0.0)
+    assert ei[1] > ei[0]
+    assert ei[1] > ei[2]
+    assert default_tx_ffe_bounds(expand_taps([-0.08, 1.0, -0.05])).shape == (9, 2)
