@@ -7,25 +7,28 @@ The implementation keeps DSP algorithms in plain NumPy so the math remains visib
 ## Current Features
 
 - PAM4 Gray mapping, slicing, BER and SER metrics.
-- 50 sps waveform path for eye-diagram generation and device/channel modeling.
-- 2 sps DSP path.
-- TX CTLE and TX FFE.
-- DAC, driver, MZM, optical channel, PD, TIA, and ADC first-order behavioral models.
+- DAC, ADC, and DSP aligned at 2 sps.
+- Device/channel simulation at 8 sps (`channel_oversample = 4`).
+- Eye-diagram rendering by upsampling the aligned RX input to 50 sps.
+- TX FFE and optional TX CTLE.
+- DAC, driver, MZM, optical channel, PD/TIA, and ADC first-order behavioral models.
 - RX FFE that trains at 2 sps and outputs 1 sps.
 - LMS training followed by optional DD-LMS.
 - Burg-initialized partial-response estimation and hard-decision Viterbi MLSE.
-- 112G and 224G example runs.
+- Separate FFE-output BER and MLSE-output BER reporting.
+- 112G, 224G, and clean ideal code-validation example runs.
 - Optional `.xlsx` parameter loading into flat dictionaries.
 
 ## Quick Start
 
 ```powershell
+.\.venv\Scripts\python examples\run_clean.py
 .\.venv\Scripts\python examples\run_112g.py
 .\.venv\Scripts\python examples\run_224g.py
 .\.venv\Scripts\python -m pytest
 ```
 
-Outputs are written under `artifacts/`.
+Outputs are written under `artifacts/`. The main eye plot is now `eye_rx_input_50sps.png`.
 
 ## Design Notes
 
@@ -35,5 +38,5 @@ See:
 
 - `docs/architecture.md`
 - `docs/parameters.md`
+- `docs/status.md`
 - `docs/roadmap.md`
-

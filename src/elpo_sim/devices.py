@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 
 from .filters import lowpass
 
@@ -41,6 +41,8 @@ def driver_model(v, sample_rate_hz, cfg, rng):
 
 def mzm_model(v, cfg):
     v = np.asarray(v, dtype=float)
+    if cfg.get("model") == "linear":
+        return cfg.get("optical_power_w", 1e-3) + cfg.get("linear_gain_w_per_unit", 1e-3) * v
     vpi = cfg.get("vpi_v", 3.5)
     bias = cfg.get("bias_v", 0.0)
     optical_power_w = cfg.get("optical_power_w", 1e-3)
@@ -65,7 +67,7 @@ def optical_channel_model(power_w, sample_rate_hz, cfg, rng):
     return np.maximum(y, 0.0)
 
 
-def pd_tia_adc_model(power_w, sample_rate_hz, cfg, rng):
+def pd_tia_model(power_w, sample_rate_hz, cfg, rng):
     current = cfg.get("responsivity_a_per_w", 0.75) * np.asarray(power_w, dtype=float)
     q = 1.602176634e-19
     shot = np.sqrt(2.0 * q * np.maximum(np.mean(current), 0.0) * sample_rate_hz / 2.0)
@@ -73,6 +75,14 @@ def pd_tia_adc_model(power_w, sample_rate_hz, cfg, rng):
     volts = current * cfg.get("tia_ohm", 500.0)
     volts = lowpass(volts, sample_rate_hz, cfg.get("bandwidth_hz"), cfg.get("order", 1))
     volts = add_awgn_by_rms(volts, cfg.get("input_noise_rms_v", 0.0), rng)
-    return quantize_uniform(volts, cfg.get("adc_bits"), cfg.get("adc_full_scale_v"))
+    return volts
 
 
+def adc_model(volts, cfg, rng):
+    y = add_awgn_by_rms(volts, cfg.get("adc_noise_rms_v", 0.0), rng)
+    return quantize_uniform(y, cfg.get("adc_bits"), cfg.get("adc_full_scale_v"))
+
+
+def pd_tia_adc_model(power_w, sample_rate_hz, cfg, rng):
+    volts = pd_tia_model(power_w, sample_rate_hz, cfg, rng)
+    return adc_model(volts, cfg, rng)

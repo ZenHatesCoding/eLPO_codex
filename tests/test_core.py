@@ -1,11 +1,11 @@
-﻿import os
+import os
 import sys
 
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from elpo_sim.configs import params_112g
+from elpo_sim.configs import params_112g, params_clean
 from elpo_sim.mlse import estimate_pr_filter, hard_mlse
 from elpo_sim.pam4 import bits_to_symbols, random_bits, slicer
 from elpo_sim.sim import run_link
@@ -29,6 +29,22 @@ def test_mlse_recovers_simple_partial_response():
     assert np.mean(rx[20:-20] != idx[20:-20]) < 0.08
 
 
+def test_clean_link_has_zero_ber_and_expected_rates():
+    cfg = params_clean(112)
+    cfg["n_symbols"] = 2500
+    cfg["rx_ffe"]["n_train"] = 800
+    cfg["rx_ffe"]["dd_start"] = 800
+    result = run_link(cfg, artifact_dir="artifacts/test")
+    assert result["rates"]["dsp_sps"] == 2
+    assert result["rates"]["dac_sps"] == 2
+    assert result["rates"]["adc_sps"] == 2
+    assert result["rates"]["channel_sps"] == 8
+    assert result["rates"]["eye_sps"] == 50
+    assert result["ber_ffe"] == 0.0
+    assert result["ber_mlse"] is None
+    assert result["ber_final"] == 0.0
+
+
 def test_smoke_link_short():
     cfg = params_112g()
     cfg["n_symbols"] = 2500
@@ -39,5 +55,4 @@ def test_smoke_link_short():
     assert result["bit_count"] > 1000
     assert np.isfinite(result["ber_final"])
     assert result["rx_ffe_taps"].size == cfg["rx_ffe"]["n_taps"]
-
 
