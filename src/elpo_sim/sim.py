@@ -5,7 +5,7 @@ from .devices import adc_model, dac_model, driver_model, mzm_model, optical_chan
 from .dsp import train_rx_ffe_lms, dd_lms_update, level_scale_from_training, apply_level_scale
 from .filters import apply_fir, ctle, waveform_from_symbols, sample_at_sps, resample_linear
 from .metrics import ber_from_indices, ser_from_indices, pam4_eye_openings
-from .mlse import estimate_pr_filter, hard_mlse
+from .mlse import causal_fir, estimate_noise_whitening_pr, hard_mlse
 from .pam4 import bits_to_symbols, random_bits, slicer, PAM4_LEVELS
 from .plotting import save_eye, save_bathtub_like_hist
 
@@ -69,12 +69,7 @@ def run_link(cfg, artifact_dir="artifacts"):
     x2 = _ac_normalize(adc2)
 
     rx_ffe_cfg = cfg.get("rx_ffe", {})
-    target_response = np.asarray(rx_ffe_cfg.get("target_response", [1.0]), dtype=float)
-    if target_response.size > 1:
-        ffe_target = np.convolve(tx_symbols, target_response, mode="full")[: len(tx_symbols)]
-    else:
-        ffe_target = tx_symbols
-    ffe = train_rx_ffe_lms(x2, ffe_target, rx_ffe_cfg)
+    ffe = train_rx_ffe_lms(x2, tx_symbols, rx_ffe_cfg)
     y_raw, taps_dd = dd_lms_update(
         x2,
         ffe["taps"],
@@ -83,21 +78,23 @@ def run_link(cfg, artifact_dir="artifacts"):
         rx_ffe_cfg,
     )
     aligned_tx = tx_symbols[: len(y_raw)]
-    aligned_ffe_target = ffe_target[: len(y_raw)]
-    n_scale = min(rx_ffe_cfg.get("n_train", 1000), len(y_raw), len(aligned_ffe_target))
-    gain, offset = level_scale_from_training(y_raw[:n_scale], aligned_ffe_target[:n_scale])
+    n_scale = min(rx_ffe_cfg.get("n_train", 1000), len(y_raw), len(aligned_tx))
+    gain, offset = level_scale_from_training(y_raw[:n_scale], aligned_tx[:n_scale])
     y = apply_level_scale(y_raw, gain, offset)
     rx_idx_ffe = slicer(y)
 
     mlse_cfg = cfg.get("mlse", {})
     mlse_enabled = bool(mlse_cfg.get("enable", True))
     pr = None
+    y_pr = None
     rx_idx_mlse = None
     y_mlse_levels = None
     if mlse_enabled:
+        memory_depth = int(mlse_cfg.get("memory_depth", 1))
         n_pr = min(int(mlse_cfg.get("train_symbols", 3000)), len(y), len(aligned_tx))
-        pr = estimate_pr_filter(y[:n_pr], int(mlse_cfg.get("pr_order", 3)), aligned_tx[:n_pr])
-        y_mlse_levels = hard_mlse(y, pr)
+        pr = estimate_noise_whitening_pr(y[:n_pr], aligned_tx[:n_pr], memory_depth)
+        y_pr = causal_fir(y, pr)
+        y_mlse_levels = hard_mlse(y_pr, pr)
         rx_idx_mlse = slicer(y_mlse_levels)
 
     ber_ffe, bit_errors_ffe, bit_count = ber_from_indices(tx_idx, rx_idx_ffe)
@@ -140,7 +137,6 @@ def run_link(cfg, artifact_dir="artifacts"):
         "ffe": ffe,
         "rx_ffe_taps": taps_dd,
         "level_scale": (gain, offset),
-        "rx_ffe_target_response": target_response,
         "partial_response": pr,
         "mlse_enabled": mlse_enabled,
         "ber_ffe": ber_ffe,
@@ -163,6 +159,7 @@ def run_link(cfg, artifact_dir="artifacts"):
         "rx_idx_mlse": rx_idx_mlse,
         "rx_idx_final": rx_idx_final,
         "y_ffe": y,
+        "y_pr": y_pr,
         "y_mlse_levels": y_mlse_levels,
         "snapshots": {
             "tx_symbols": tx_symbols,

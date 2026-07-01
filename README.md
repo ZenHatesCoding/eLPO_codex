@@ -14,7 +14,7 @@ The implementation keeps DSP algorithms in plain NumPy so the math remains visib
 - DAC, driver, MZM, optical channel, PD/TIA, and ADC first-order behavioral models.
 - RX FFE that trains at 2 sps and outputs 1 sps.
 - LMS training followed by optional DD-LMS.
-- Burg-initialized partial-response estimation and hard-decision Viterbi MLSE.
+- Burg-estimated post-FFE noise-whitening PR filter and hard-decision Viterbi MLSE.
 - Separate FFE-output BER and MLSE-output BER reporting.
 - 112G, 224G, and clean ideal code-validation example runs.
 - Optional `.xlsx` parameter loading into flat dictionaries.
@@ -41,4 +41,5 @@ See:
 - `docs/parameters.md`
 - `docs/status.md`
 - `docs/roadmap.md`
+
 

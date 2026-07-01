@@ -24,7 +24,6 @@ Public anchors used for this choice:
 - OIF CEI-112G and CEI-224G implementation agreements define common electrical interface families used around 112G/224G ecosystems.
 - Recent PR-PAM4/MLSE IMDD papers commonly combine partial-response shaping and MLSE to trade bandwidth for sequence detection robustness.
 
-
 ## Bandwidth Source In This Baseline
 
 There is no measured S-parameter in the repository yet. The current DAC, driver, optical channel, and PD/TIA bandwidths are explicit first-order low-pass assumptions expressed as fractions of symbol rate. They are useful for algorithm bring-up and sensitivity sweeps, but they are not calibrated to a specific package, board, modulator, TIA, or module.
@@ -52,19 +51,19 @@ The models are first-order behavioral blocks, not final compact models. The impo
 
 - RX FFE uses 19 taps for 112G and 23 taps for 224G by default.
 - LMS starts with known training symbols, then DD-LMS uses hard PAM4 decisions.
-- MLSE uses a short partial-response memory by default (`pr_order = 3`) so the Viterbi state space remains transparent.
+- The FFE target is the original PAM4 symbol stream; it is not intentionally left short of equalization to create PR ISI.
+- MLSE uses a post-FFE noise-whitening partial-response filter. The default memory depth is 1, so the filter is `1 + alpha z^-1`.
+- `alpha` is estimated from the FFE training residual using Burg AR estimation.
 - BER is reported separately at the FFE output and MLSE output.
-
 
 ## MLSE Gain Conditions
 
-The default 112G/224G presets train the RX FFE toward the original PAM4 symbols, so the FFE output is close to a zero-ISI target. In that mode the estimated partial-response filter is close to `[1, 0, 0, 0]`, and hard MLSE has little memory to exploit.
+The intended flow is: FFE completes equalization, FFE noise enhancement leaves colored residual noise, the PR filter whitens that noise and reintroduces controlled ISI, and MLSE detects through that PR response.
 
-`params_pr_mlse_demo()` demonstrates the intended PR-MLSE mode: the RX FFE is trained to a controlled partial-response target, for example `[1, 0.45, -0.12]`. The direct FFE slicer then sees intentional ISI, while MLSE uses the PR estimate to recover the sequence.
+If the FFE residual noise is already close to white, the estimated `alpha` will be small and MLSE will show little gain. That is expected. `examples/run_pr_mlse_demo.py` demonstrates the algorithm with a controlled AR(1) colored-noise residual: the FFE slicer sees colored noise directly, while the PR-whitened MLSE sees a sequence channel with whiter noise.
 
 ## Notes To Improve Later
 
 - Replace the simple optical channel with measured S-parameter import or fitted pole-zero models.
 - Add standards-specific presets for 802.3ck, 802.3dj, CEI-112G-VSR/MR/LR, and CEI-224G.
 - Add calibration scripts that fit device dictionaries from lab data.
-

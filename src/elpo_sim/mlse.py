@@ -8,6 +8,8 @@ def burg_ar(x, order):
     x = np.asarray(x, dtype=float) - np.mean(x)
     if order <= 0:
         return np.array([1.0]), 0.0
+    if x.size <= order + 1 or np.mean(x * x) < 1e-24:
+        return np.r_[1.0, np.zeros(order)], 0.0
     ef = x[1:].copy()
     eb = x[:-1].copy()
     a = np.array([1.0], dtype=float)
@@ -15,6 +17,7 @@ def burg_ar(x, order):
     for m in range(1, order + 1):
         den = np.dot(ef, ef) + np.dot(eb, eb) + 1e-15
         k = -2.0 * np.dot(eb, ef) / den
+        k = float(np.clip(k, -0.98, 0.98))
         a_new = np.r_[a, 0.0]
         a_new[1:] += k * a[::-1]
         a = a_new
@@ -24,6 +27,22 @@ def burg_ar(x, order):
             eb_next = eb[:-1] + k * ef[:-1]
             ef, eb = ef_next, eb_next
     return a, e
+
+
+def causal_fir(x, h):
+    return np.convolve(np.asarray(x, dtype=float), np.asarray(h, dtype=float), mode="full")[: len(x)]
+
+
+def estimate_noise_whitening_pr(ffe_samples, reference_symbols, memory_depth=1):
+    n = min(len(ffe_samples), len(reference_symbols))
+    if memory_depth <= 0:
+        return np.array([1.0])
+    err = np.asarray(ffe_samples[:n], dtype=float) - np.asarray(reference_symbols[:n], dtype=float)
+    h, _ = burg_ar(err, int(memory_depth))
+    if abs(h[0]) < 1e-15:
+        h[0] = 1.0
+    h = h / h[0]
+    return h
 
 
 def estimate_pr_filter(y, order=3, refine_symbols=None):
@@ -59,8 +78,7 @@ def hard_mlse(y, h):
     state_to_i = {s: i for i, s in enumerate(states)}
     n_states = len(states)
     inf = 1e300
-    metric = np.full(n_states, inf)
-    metric[state_to_i[tuple([0.0] * memory)] if tuple([0.0] * memory) in state_to_i else 0] = 0.0
+    metric = np.zeros(n_states, dtype=float)
     prev_state = np.zeros((len(y), n_states), dtype=np.int32)
     prev_sym = np.zeros((len(y), n_states), dtype=float)
     for k, sample in enumerate(y):
@@ -86,4 +104,3 @@ def hard_mlse(y, h):
         out[k] = prev_sym[k, si]
         si = int(prev_state[k, si])
     return out
-

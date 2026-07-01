@@ -1,25 +1,41 @@
 import os
 import sys
 
+import numpy as np
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from elpo_sim.configs import params_pr_mlse_demo
-from elpo_sim.sim import run_link
-
-
-def fmt_ber(value, errors, total):
-    if value is None:
-        return "disabled"
-    return f"{value:.3e} ({errors}/{total})"
+from elpo_sim.metrics import ber_from_indices
+from elpo_sim.mlse import causal_fir, estimate_noise_whitening_pr, hard_mlse
+from elpo_sim.pam4 import bits_to_symbols, random_bits, slicer
 
 
 if __name__ == "__main__":
-    cfg = params_pr_mlse_demo(112)
-    result = run_link(cfg)
-    print("Controlled PR MLSE demo")
-    print(f"BER FFE  : {fmt_ber(result['ber_ffe'], result['bit_errors_ffe'], result['bit_count'])}")
-    print(f"BER MLSE : {fmt_ber(result['ber_mlse'], result['bit_errors_mlse'], result['bit_count'])}")
-    print(f"SER MLSE : {fmt_ber(result['ser_mlse'], result['sym_errors_mlse'], result['sym_count'])}")
-    print(f"FFE target response: {result['rx_ffe_target_response']}")
-    print(f"Estimated PR       : {result['partial_response']}")
-    print(f"Artifacts          : {result['artifact_dir']}")
+    n_symbols = 12000
+    rng = np.random.default_rng(7)
+    bits = random_bits(2 * n_symbols, seed=7)
+    tx_symbols, tx_idx = bits_to_symbols(bits)
+
+    # Model the FFE output after it has equalized the signal path. The remaining
+    # noise is colored, which is what the PR/whitening filter is meant to handle.
+    rho = 0.85
+    white = rng.normal(0.0, 0.45, n_symbols)
+    colored_noise = np.zeros(n_symbols)
+    for k in range(1, n_symbols):
+        colored_noise[k] = rho * colored_noise[k - 1] + white[k]
+    ffe_out = tx_symbols + colored_noise
+
+    rx_idx_ffe = slicer(ffe_out)
+    ber_ffe, err_ffe, bit_count = ber_from_indices(tx_idx, rx_idx_ffe)
+
+    pr = estimate_noise_whitening_pr(ffe_out[:3000], tx_symbols[:3000], memory_depth=1)
+    pr_out = causal_fir(ffe_out, pr)
+    mlse_levels = hard_mlse(pr_out, pr)
+    rx_idx_mlse = slicer(mlse_levels)
+    ber_mlse, err_mlse, _ = ber_from_indices(tx_idx, rx_idx_mlse)
+
+    print("FFE noise-whitening PR-MLSE demo")
+    print(f"BER FFE  : {ber_ffe:.3e} ({err_ffe}/{bit_count})")
+    print(f"BER MLSE : {ber_mlse:.3e} ({err_mlse}/{bit_count})")
+    print(f"Estimated PR whitening filter: {pr}")
+
